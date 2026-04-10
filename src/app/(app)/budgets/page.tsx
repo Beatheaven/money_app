@@ -14,7 +14,7 @@ interface Budget {
   startDate: string;
   endDate: string;
   isAutoRenew: boolean;
-  category: { name: string; color: string; icon: string };
+  category: { id: string; name: string; color: string; icon: string };
 }
 
 interface Category {
