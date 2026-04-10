@@ -86,7 +86,9 @@ export async function GET(request: Request) {
     take: 6,
   });
 
-  const categoryIds = categoryData.map((c) => c.categoryId);
+  const categoryIds = categoryData
+    .map((c) => c.categoryId)
+    .filter((id): id is string => id !== null);
   const categories = await prisma.category.findMany({
     where: { id: { in: categoryIds } },
     select: { id: true, name: true, color: true, icon: true },
