@@ -5,8 +5,9 @@ import { categorySchema } from "@/lib/validations";
 
 export async function PUT(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   const session = await auth();
   if (!session?.user?.id)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -16,14 +17,14 @@ export async function PUT(
     const validated = categorySchema.parse(body);
 
     const existing = await prisma.category.findFirst({
-      where: { id: params.id, userId: session.user.id, isDefault: false },
+      where: { id, userId: session.user.id, isDefault: false },
     });
 
     if (!existing)
       return NextResponse.json({ error: "Category not found or cannot be edited" }, { status: 404 });
 
     const category = await prisma.category.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         name: validated.name,
         type: validated.type,
@@ -40,15 +41,16 @@ export async function PUT(
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   const session = await auth();
   if (!session?.user?.id)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   try {
     const existing = await prisma.category.findFirst({
-      where: { id: params.id, userId: session.user.id, isDefault: false },
+      where: { id, userId: session.user.id, isDefault: false },
     });
 
     if (!existing)
@@ -56,11 +58,11 @@ export async function DELETE(
 
     // Cek proteksi Foreign Key secara logis
     const transactionsCount = await prisma.transaction.count({
-      where: { categoryId: params.id },
+      where: { categoryId: id },
     });
     
     const budgetsCount = await prisma.budget.count({
-      where: { categoryId: params.id },
+      where: { categoryId: id },
     });
 
     if (transactionsCount > 0 || budgetsCount > 0) {
@@ -71,7 +73,7 @@ export async function DELETE(
     }
 
     await prisma.category.delete({
-      where: { id: params.id },
+      where: { id },
     });
 
     return NextResponse.json({ success: true });
