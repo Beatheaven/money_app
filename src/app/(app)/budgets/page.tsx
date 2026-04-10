@@ -13,6 +13,7 @@ interface Budget {
   period: string;
   startDate: string;
   endDate: string;
+  isAutoRenew: boolean;
   category: { name: string; color: string; icon: string };
 }
 
@@ -44,6 +45,7 @@ export default function BudgetsPage() {
     categoryId: "",
     startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split("T")[0],
     endDate: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().split("T")[0],
+    isAutoRenew: true,
   });
 
   async function fetchData() {
@@ -63,11 +65,28 @@ export default function BudgetsPage() {
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     setFormLoading(true);
+
+    let finalEndDate = form.endDate;
+    if (form.isAutoRenew) {
+      const st = new Date(form.startDate);
+      if (form.period === "MONTHLY") st.setMonth(st.getMonth() + 1);
+      else if (form.period === "WEEKLY") st.setDate(st.getDate() + 7);
+      else if (form.period === "YEARLY") st.setFullYear(st.getFullYear() + 1);
+      else if (form.period === "DAILY") st.setDate(st.getDate() + 1);
+      finalEndDate = st.toISOString().split("T")[0];
+    }
+
     await fetch("/api/budgets", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...form, amount: parseFloat(form.amount), bookId: activeBookId }),
+      body: JSON.stringify({ 
+        ...form, 
+        amount: parseFloat(form.amount), 
+        endDate: finalEndDate,
+        bookId: activeBookId 
+      }),
     });
+    
     await fetchData();
     setShowForm(false);
     setFormLoading(false);
@@ -168,6 +187,14 @@ export default function BudgetsPage() {
                       >
                         {PERIOD_LABELS[budget.period]}
                       </span>
+                      {new Date(budget.endDate) < new Date() ? (
+                        <span style={{ fontSize: 11, fontWeight: 500, color: "var(--text-secondary)", padding: "3px 8px", borderRadius: 20, background: "var(--border)" }}>Berakhir</span>
+                      ) : (
+                        <span style={{ fontSize: 11, fontWeight: 500, color: "#10b981", padding: "3px 8px", borderRadius: 20, background: "rgba(16,185,129,0.1)" }}>Aktif</span>
+                      )}
+                      {budget.isAutoRenew && (
+                         <span style={{ fontSize: 11, fontWeight: 500, color: "#8b5cf6", padding: "3px 8px", borderRadius: 20, background: "rgba(139,92,246,0.1)" }}>⚡ Auto</span>
+                      )}
                     </div>
                     <h3 style={{ fontSize: 16, fontWeight: 700, color: "var(--text-primary)" }}>
                       {budget.name}
@@ -249,6 +276,19 @@ export default function BudgetsPage() {
                   ))}
                 </select>
               </div>
+
+              <div style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--surface-2)", padding: 12, borderRadius: 10 }}>
+                <input 
+                  type="checkbox" 
+                  id="autoRenew" 
+                  checked={form.isAutoRenew} 
+                  onChange={(e) => setForm({ ...form, isAutoRenew: e.target.checked })} 
+                  style={{ width: 16, height: 16, accentColor: "#6366f1", cursor: "pointer" }} 
+                />
+                <label htmlFor="autoRenew" style={{ fontSize: 13, fontWeight: 500, color: "var(--text-primary)", cursor: "pointer" }}>
+                  Perbarui otomatis tiap siklus (Budget Permanen)
+                </label>
+              </div>
               <div>
                 <label style={{ display: "block", fontSize: 13, fontWeight: 500, color: "var(--text-secondary)", marginBottom: 8 }}>Limit Nominal</label>
                 <input type="number" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} className="input-base" placeholder="0" min="0" step="any" required />
@@ -256,11 +296,19 @@ export default function BudgetsPage() {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <div>
                   <label style={{ display: "block", fontSize: 13, fontWeight: 500, color: "var(--text-secondary)", marginBottom: 8 }}>Tanggal Mulai</label>
-                  <input type="date" value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} className="input-base" style={{ colorScheme: "dark" }} />
+                  <input type="date" value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} className="input-base" style={{ colorScheme: "dark" }} required />
                 </div>
                 <div>
                   <label style={{ display: "block", fontSize: 13, fontWeight: 500, color: "var(--text-secondary)", marginBottom: 8 }}>Tanggal Akhir</label>
-                  <input type="date" value={form.endDate} onChange={(e) => setForm({ ...form, endDate: e.target.value })} className="input-base" style={{ colorScheme: "dark" }} />
+                  <input 
+                    type="date" 
+                    value={form.endDate} 
+                    onChange={(e) => setForm({ ...form, endDate: e.target.value })} 
+                    className="input-base" 
+                    style={{ colorScheme: "dark", opacity: form.isAutoRenew ? 0.5 : 1, cursor: form.isAutoRenew ? "not-allowed" : "text" }} 
+                    disabled={form.isAutoRenew}
+                    required={!form.isAutoRenew} 
+                  />
                 </div>
               </div>
               <div style={{ display: "flex", gap: 10, marginTop: 4 }}>

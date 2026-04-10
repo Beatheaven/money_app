@@ -131,6 +131,7 @@ model Budget {
   period       BudgetPeriod  @default(MONTHLY)
   startDate    DateTime
   endDate      DateTime
+  isAutoRenew  Boolean       @default(false)
   categoryId   String
   category     Category      @relation(fields: [categoryId], references: [id])
   bookId       String
