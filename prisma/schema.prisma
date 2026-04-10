@@ -1,13 +1,164 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "sqlite"
+}
+
+// ─── AUTH (NextAuth) ─────────────────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?
+  currency      String    @default("IDR")
+  accounts      Account[]
+  sessions      Session[]
+  books         Book[]
+  categories    Category[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ─── KEUANGAN ────────────────────────────────────────────────────────────────
+
+model Book {
+  id          String        @id @default(cuid())
+  name        String
+  description String?
+  currency    String        @default("IDR")
+  icon        String        @default("book")
+  color       String        @default("#6366f1")
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wallets     Wallet[]
+  budgets     Budget[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model Wallet {
+  id           String        @id @default(cuid())
+  name         String
+  type         WalletType    @default(CASH)
+  balance      Float         @default(0)
+  currency     String        @default("IDR")
+  color        String        @default("#6366f1")
+  icon         String        @default("wallet")
+  bookId       String
+  book         Book          @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+model Category {
+  id           String          @id @default(cuid())
+  name         String
+  icon         String          @default("tag")
+  color        String          @default("#6366f1")
+  type         TransactionType
+  isDefault    Boolean         @default(false)
+  userId       String?
+  user         User?           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+  budgets      Budget[]
+  createdAt    DateTime        @default(now())
+}
+
+model Transaction {
+  id          String          @id @default(cuid())
+  amount      Float
+  type        TransactionType
+  note        String?
+  date        DateTime        @default(now())
+  walletId    String
+  wallet      Wallet          @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  categoryId  String
+  category    Category        @relation(fields: [categoryId], references: [id])
+  budgetId    String?
+  budget      Budget?         @relation(fields: [budgetId], references: [id])
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+}
+
+model Budget {
+  id           String        @id @default(cuid())
+  name         String
+  amount       Float
+  spent        Float         @default(0)
+  period       BudgetPeriod  @default(MONTHLY)
+  startDate    DateTime
+  endDate      DateTime
+  categoryId   String
+  category     Category      @relation(fields: [categoryId], references: [id])
+  bookId       String
+  book         Book          @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+// ─── ENUMS ───────────────────────────────────────────────────────────────────
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+}
+
+enum WalletType {
+  CASH
+  BANK
+  EWALLET
+  INVESTMENT
+  CREDIT
+  OTHER
+}
+
+enum BudgetPeriod {
+  DAILY
+  WEEKLY
+  MONTHLY
+  YEARLY
 }
