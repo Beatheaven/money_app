@@ -31,11 +31,12 @@ export default function EditTransactionPage({ params }: { params: Promise<{ id: 
   const [wallets, setWallets] = useState<Wallet[]>([]);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({
-    type: "EXPENSE" as "INCOME" | "EXPENSE",
+    type: "EXPENSE" as "INCOME" | "EXPENSE" | "TRANSFER",
     amount: "",
     note: "",
     date: new Date().toISOString().split("T")[0],
     walletId: "",
+    toWalletId: "",
     categoryId: "",
   });
   const [error, setError] = useState("");
@@ -50,12 +51,13 @@ export default function EditTransactionPage({ params }: { params: Promise<{ id: 
       setWallets(Array.isArray(wals) ? wals : []);
       if (txData && !txData.error) {
           setForm({
-              type: txData.type,
+              type: txData.type as "INCOME" | "EXPENSE" | "TRANSFER",
               amount: txData.amount.toString(),
               note: txData.note || "",
               date: new Date(txData.date).toISOString().split("T")[0],
               walletId: txData.walletId,
-              categoryId: txData.categoryId,
+              toWalletId: txData.toWalletId || "",
+              categoryId: txData.categoryId || "",
           });
       }
       setLoading(false);
@@ -77,9 +79,20 @@ export default function EditTransactionPage({ params }: { params: Promise<{ id: 
       setError("Pilih wallet");
       return;
     }
-    if (!form.categoryId) {
-      setError("Pilih kategori");
-      return;
+    if (form.type === "TRANSFER") {
+      if (!form.toWalletId) {
+        setError("Pilih dompet tujuan");
+        return;
+      }
+      if (form.walletId === form.toWalletId) {
+        setError("Dompet asal dan tujuan tidak boleh sama");
+        return;
+      }
+    } else {
+      if (!form.categoryId) {
+        setError("Pilih kategori");
+        return;
+      }
     }
 
     setLoading(true);
@@ -93,7 +106,8 @@ export default function EditTransactionPage({ params }: { params: Promise<{ id: 
           note: form.note || null,
           date: form.date,
           walletId: form.walletId,
-          categoryId: form.categoryId,
+          toWalletId: form.type === "TRANSFER" ? form.toWalletId : undefined,
+          categoryId: form.type !== "TRANSFER" ? form.categoryId : undefined,
         }),
       });
 
@@ -158,31 +172,35 @@ export default function EditTransactionPage({ params }: { params: Promise<{ id: 
             <label style={{ display: "block", fontSize: 13, fontWeight: 500, color: "var(--text-secondary)", marginBottom: 10 }}>
               Tipe Transaksi
             </label>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-              {(["EXPENSE", "INCOME"] as const).map((type) => (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+              {(["EXPENSE", "INCOME", "TRANSFER"] as const).map((type) => (
                 <button
                   key={type}
                   type="button"
-                  onClick={() => setForm({ ...form, type, categoryId: "" })}
+                  onClick={() => setForm({ ...form, type, categoryId: "", toWalletId: "" })}
                   style={{
-                    padding: "12px",
+                    padding: "12px 6px",
                     borderRadius: 10,
                     border: form.type === type
-                      ? `1.5px solid ${type === "INCOME" ? "#10b981" : "#f43f5e"}`
+                      ? `1.5px solid ${type === "INCOME" ? "#10b981" : type === "EXPENSE" ? "#f43f5e" : "#8b5cf6"}`
                       : "1.5px solid var(--border)",
                     background: form.type === type
-                      ? type === "INCOME" ? "rgba(16,185,129,0.12)" : "rgba(244,63,94,0.12)"
+                      ? type === "INCOME" ? "rgba(16,185,129,0.12)" : type === "EXPENSE" ? "rgba(244,63,94,0.12)" : "rgba(139,92,246,0.12)"
                       : "var(--surface-2)",
                     color: form.type === type
-                      ? type === "INCOME" ? "#10b981" : "#f43f5e"
+                      ? type === "INCOME" ? "#10b981" : type === "EXPENSE" ? "#f43f5e" : "#8b5cf6"
                       : "var(--text-secondary)",
-                    fontSize: 14,
+                    fontSize: 13,
                     fontWeight: 600,
                     cursor: "pointer",
                     transition: "all 0.15s",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 4
                   }}
                 >
-                  {type === "INCOME" ? "📈 Pemasukan" : "📉 Pengeluaran"}
+                  {type === "INCOME" ? "📈 Pemasukan" : type === "EXPENSE" ? "📉 Pengeluaran" : "🔄 Transfer"}
                 </button>
               ))}
             </div>
@@ -229,46 +247,69 @@ export default function EditTransactionPage({ params }: { params: Promise<{ id: 
             </select>
           </div>
 
-          {/* Category */}
-          <div>
-            <label style={{ display: "block", fontSize: 13, fontWeight: 500, color: "var(--text-secondary)", marginBottom: 10 }}>
-              Kategori
-            </label>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(3, 1fr)",
-                gap: 8,
-                maxHeight: 200,
-                overflowY: "auto",
-                padding: "2px",
-              }}
-            >
-              {filteredCategories.map((cat) => (
-                <button
-                  key={cat.id}
-                  type="button"
-                  onClick={() => setForm({ ...form, categoryId: cat.id })}
-                  style={{
-                    padding: "10px 8px",
-                    borderRadius: 10,
-                    border: form.categoryId === cat.id
-                      ? `1.5px solid ${cat.color}`
-                      : "1.5px solid var(--border)",
-                    background: form.categoryId === cat.id ? `${cat.color}18` : "var(--surface-2)",
-                    color: form.categoryId === cat.id ? cat.color : "var(--text-secondary)",
-                    fontSize: 12,
-                    fontWeight: 500,
-                    cursor: "pointer",
-                    transition: "all 0.15s",
-                    textAlign: "center",
-                  }}
-                >
-                  {cat.name}
-                </button>
-              ))}
+          {/* Conditional: Category OR Destination Wallet */}
+          {form.type === "TRANSFER" ? (
+            <div>
+              <label htmlFor="toWallet" style={{ display: "block", fontSize: 13, fontWeight: 500, color: "var(--text-secondary)", marginBottom: 8 }}>
+                Dompet Tujuan
+              </label>
+              <select
+                id="toWallet"
+                value={form.toWalletId}
+                onChange={(e) => setForm({ ...form, toWalletId: e.target.value })}
+                className="input-base"
+                style={{ cursor: "pointer" }}
+                required
+              >
+                <option value="">Pilih dompet tujuan...</option>
+                {wallets.filter(w => w.id !== form.walletId).map((w) => (
+                  <option key={w.id} value={w.id} style={{ background: "var(--surface)" }}>
+                    {w.name}
+                  </option>
+                ))}
+              </select>
             </div>
-          </div>
+          ) : (
+            <div>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 500, color: "var(--text-secondary)", marginBottom: 10 }}>
+                Kategori
+              </label>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(3, 1fr)",
+                  gap: 8,
+                  maxHeight: 200,
+                  overflowY: "auto",
+                  padding: "2px",
+                }}
+              >
+                {filteredCategories.map((cat) => (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => setForm({ ...form, categoryId: cat.id })}
+                    style={{
+                      padding: "10px 8px",
+                      borderRadius: 10,
+                      border: form.categoryId === cat.id
+                        ? `1.5px solid ${cat.color}`
+                        : "1.5px solid var(--border)",
+                      background: form.categoryId === cat.id ? `${cat.color}18` : "var(--surface-2)",
+                      color: form.categoryId === cat.id ? cat.color : "var(--text-secondary)",
+                      fontSize: 12,
+                      fontWeight: 500,
+                      cursor: "pointer",
+                      transition: "all 0.15s",
+                      textAlign: "center",
+                    }}
+                  >
+                    {cat.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Date */}
           <div>

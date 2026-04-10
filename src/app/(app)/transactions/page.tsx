@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useBookStore } from "@/store/bookStore";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { ArrowUpRight, ArrowDownLeft, Plus, Search, Filter, Edit2, Trash2 } from "lucide-react";
+import { ArrowUpRight, ArrowDownLeft, Plus, Search, Filter, Edit2, Trash2, ArrowRightLeft } from "lucide-react";
 import Link from "next/link";
 
 interface Transaction {
@@ -14,6 +14,7 @@ interface Transaction {
   date: string;
   category: { name: string; icon: string; color: string };
   wallet: { name: string; currency: string };
+  toWallet?: { name: string; currency: string } | null;
 }
 
 export default function TransactionsPage() {
@@ -133,6 +134,7 @@ export default function TransactionsPage() {
           <option value="">Semua Tipe</option>
           <option value="INCOME">Pemasukan</option>
           <option value="EXPENSE">Pengeluaran</option>
+          <option value="TRANSFER">Transfer</option>
         </select>
       </div>
 
@@ -182,6 +184,11 @@ export default function TransactionsPage() {
             {/* Rows */}
             {filtered.map((tx) => {
               const isIncome = tx.type === "INCOME";
+              const isTransfer = tx.type === "TRANSFER";
+              
+              const iconColor = isIncome ? "#10b981" : isTransfer ? "#8b5cf6" : "#f43f5e";
+              const iconBg = isIncome ? "rgba(16,185,129,0.12)" : isTransfer ? "rgba(139,92,246,0.12)" : "rgba(244,63,94,0.12)";
+
               return (
                 <div
                   key={tx.id}
@@ -201,7 +208,7 @@ export default function TransactionsPage() {
                         width: 32,
                         height: 32,
                         borderRadius: 9,
-                        background: isIncome ? "rgba(16,185,129,0.12)" : "rgba(244,63,94,0.12)",
+                        background: iconBg,
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
@@ -209,17 +216,27 @@ export default function TransactionsPage() {
                       }}
                     >
                       {isIncome ? (
-                        <ArrowUpRight size={15} color="#10b981" />
+                        <ArrowUpRight size={15} color={iconColor} />
+                      ) : isTransfer ? (
+                        <ArrowRightLeft size={15} color={iconColor} />
                       ) : (
-                        <ArrowDownLeft size={15} color="#f43f5e" />
+                        <ArrowDownLeft size={15} color={iconColor} />
                       )}
                     </div>
                     <div>
                       <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>
                         {tx.note ?? tx.category.name}
                       </div>
-                      <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                        {tx.wallet.name}
+                      <div style={{ fontSize: 11, color: "var(--text-muted)", display: "flex", alignItems: "center", gap: 4 }}>
+                        {isTransfer ? (
+                           <>
+                             <span>{tx.wallet.name}</span>
+                             <ArrowRightLeft size={10} color="var(--text-muted)" />
+                             <span>{tx.toWallet?.name ?? "???"}</span>
+                           </>
+                        ) : (
+                           tx.wallet.name
+                        )}
                       </div>
                     </div>
                   </div>
@@ -254,11 +271,11 @@ export default function TransactionsPage() {
                     style={{
                       fontSize: 14,
                       fontWeight: 700,
-                      color: isIncome ? "#10b981" : "#f43f5e",
+                      color: isTransfer ? "var(--text-primary)" : isIncome ? "#10b981" : "#f43f5e",
                       textAlign: "right",
                     }}
                   >
-                    {isIncome ? "+" : "-"}
+                    {isIncome ? "+" : isTransfer ? "" : "-"}
                     {formatCurrency(tx.amount, tx.wallet.currency)}
                   </div>
 

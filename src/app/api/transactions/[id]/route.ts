@@ -57,31 +57,65 @@ export async function PUT(
 
     const updatedTransaction = await prisma.$transaction(async (tx) => {
       // 1. REVERSE OLD
-      const reverseAmount = oldTx.type === "INCOME" ? -oldTx.amount : oldTx.amount;
-      await tx.wallet.update({
-        where: { id: oldTx.walletId },
-        data: { balance: { increment: reverseAmount } },
-      });
+      if (oldTx.type === "TRANSFER") {
+          await tx.wallet.update({
+             where: { id: oldTx.walletId },
+             data: { balance: { increment: oldTx.amount } }, // Return money to source
+          });
+          if (oldTx.toWalletId) {
+             await tx.wallet.update({
+                 where: { id: oldTx.toWalletId },
+                 data: { balance: { decrement: oldTx.amount } }, // Take money back from destination
+             });
+          }
+      } else {
+          const reverseAmount = oldTx.type === "INCOME" ? -oldTx.amount : oldTx.amount;
+          await tx.wallet.update({
+            where: { id: oldTx.walletId },
+            data: { balance: { increment: reverseAmount } },
+          });
 
-      if (oldTx.budgetId && oldTx.type === "EXPENSE") {
-        await tx.budget.update({
-          where: { id: oldTx.budgetId },
-          data: { spent: { decrement: oldTx.amount } },
-        });
+          if (oldTx.budgetId && oldTx.type === "EXPENSE") {
+            await tx.budget.update({
+              where: { id: oldTx.budgetId },
+              data: { spent: { decrement: oldTx.amount } },
+            });
+          }
       }
 
       // 2. APPLY NEW
-      const applyAmount = validated.type === "INCOME" ? validated.amount : -validated.amount;
-      await tx.wallet.update({
-        where: { id: validated.walletId },
-        data: { balance: { increment: applyAmount } },
-      });
+      if (validated.type === "TRANSFER") {
+          // Extra logic to verify destination wallet existence if TRANSFER
+          if (validated.toWalletId) {
+            const toWallet = await tx.wallet.findFirst({
+                where: { id: validated.toWalletId, book: { userId: session.user.id } },
+            });
+            if (!toWallet) throw new Error("Destination Wallet not found");
+          }
 
-      if (validated.budgetId && validated.type === "EXPENSE") {
-        await tx.budget.update({
-          where: { id: validated.budgetId },
-          data: { spent: { increment: validated.amount } },
-        });
+          await tx.wallet.update({
+             where: { id: validated.walletId },
+             data: { balance: { decrement: validated.amount } }, // Decrease source
+          });
+          if (validated.toWalletId) {
+             await tx.wallet.update({
+                 where: { id: validated.toWalletId },
+                 data: { balance: { increment: validated.amount } }, // Increase destination
+             });
+          }
+      } else {
+          const applyAmount = validated.type === "INCOME" ? validated.amount : -validated.amount;
+          await tx.wallet.update({
+            where: { id: validated.walletId },
+            data: { balance: { increment: applyAmount } },
+          });
+
+          if (validated.budgetId && validated.type === "EXPENSE") {
+            await tx.budget.update({
+              where: { id: validated.budgetId },
+              data: { spent: { increment: validated.amount } },
+            });
+          }
       }
 
       // 3. UPDATE TRANSACTION
@@ -89,11 +123,12 @@ export async function PUT(
         where: { id },
         data: {
           amount: validated.amount,
-          type: validated.type as "INCOME" | "EXPENSE",
+          type: validated.type as "INCOME" | "EXPENSE" | "TRANSFER",
           note: validated.note,
           date: new Date(validated.date),
           walletId: validated.walletId,
-          categoryId: validated.categoryId,
+          toWalletId: validated.toWalletId || null,
+          categoryId: validated.categoryId || null,
           budgetId: validated.budgetId || null,
         },
         include: { category: true, wallet: true },
@@ -126,17 +161,30 @@ export async function DELETE(
 
     await prisma.$transaction(async (tx) => {
       // Reverse old effect
-      const reverseAmount = oldTx.type === "INCOME" ? -oldTx.amount : oldTx.amount;
-      await tx.wallet.update({
-        where: { id: oldTx.walletId },
-        data: { balance: { increment: reverseAmount } },
-      });
+      if (oldTx.type === "TRANSFER") {
+          await tx.wallet.update({
+             where: { id: oldTx.walletId },
+             data: { balance: { increment: oldTx.amount } }, // Return money to source
+          });
+          if (oldTx.toWalletId) {
+             await tx.wallet.update({
+                 where: { id: oldTx.toWalletId },
+                 data: { balance: { decrement: oldTx.amount } }, // Take money back from destination
+             });
+          }
+      } else {
+          const reverseAmount = oldTx.type === "INCOME" ? -oldTx.amount : oldTx.amount;
+          await tx.wallet.update({
+            where: { id: oldTx.walletId },
+            data: { balance: { increment: reverseAmount } },
+          });
 
-      if (oldTx.budgetId && oldTx.type === "EXPENSE") {
-        await tx.budget.update({
-          where: { id: oldTx.budgetId },
-          data: { spent: { decrement: oldTx.amount } },
-        });
+          if (oldTx.budgetId && oldTx.type === "EXPENSE") {
+            await tx.budget.update({
+              where: { id: oldTx.budgetId },
+              data: { spent: { decrement: oldTx.amount } },
+            });
+          }
       }
 
       await tx.transaction.delete({ where: { id } });

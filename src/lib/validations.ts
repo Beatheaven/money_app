@@ -32,12 +32,24 @@ export const walletSchema = z.object({
 
 export const transactionSchema = z.object({
   amount: z.number().positive("Nominal harus lebih dari 0"),
-  type: z.enum(["INCOME", "EXPENSE"]),
+  type: z.enum(["INCOME", "EXPENSE", "TRANSFER"]),
   note: z.string().optional(),
   date: z.string(),
-  walletId: z.string().min(1, "Pilih wallet"),
-  categoryId: z.string().min(1, "Pilih kategori"),
+  walletId: z.string().min(1, "Pilih wallet sumber"),
+  toWalletId: z.string().optional(),
+  categoryId: z.string().optional(),
   budgetId: z.string().optional(),
+}).refine((data) => {
+  if (data.type === "TRANSFER") {
+    if (!data.toWalletId) return false;
+    if (data.walletId === data.toWalletId) return false;
+  } else {
+    if (!data.categoryId) return false;
+  }
+  return true;
+}, {
+  message: "Pastikan dompet tujuan dipilih untuk transfer, atau kategori dipilih untuk selain transfer.",
+  path: ["toWalletId"], // Setting path helps attach the error to proper field in some forms
 });
 
 export const budgetSchema = z.object({

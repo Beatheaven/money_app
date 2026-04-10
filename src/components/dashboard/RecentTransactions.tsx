@@ -2,7 +2,7 @@
 
 import { formatCurrency, formatDate } from "@/lib/utils";
 import Link from "next/link";
-import { ArrowUpRight, ArrowDownLeft } from "lucide-react";
+import { ArrowUpRight, ArrowDownLeft, ArrowRightLeft } from "lucide-react";
 
 interface Transaction {
   id: string;
@@ -80,6 +80,9 @@ export function RecentTransactions({ transactions, loading }: RecentTransactions
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {transactions.map((tx) => {
             const isIncome = tx.type === "INCOME";
+            const isTransfer = tx.type === "TRANSFER";
+            const iconColor = isIncome ? "#10b981" : isTransfer ? "#8b5cf6" : "#f43f5e";
+            
             return (
               <div
                 key={tx.id}
@@ -108,9 +111,11 @@ export function RecentTransactions({ transactions, loading }: RecentTransactions
                   }}
                 >
                   {isIncome ? (
-                    <ArrowUpRight size={16} color="#10b981" />
+                    <ArrowUpRight size={16} color={iconColor} />
+                  ) : isTransfer ? (
+                    <ArrowRightLeft size={16} color={iconColor} />
                   ) : (
-                    <ArrowDownLeft size={16} color="#f43f5e" />
+                    <ArrowDownLeft size={16} color={iconColor} />
                   )}
                 </div>
 
@@ -138,11 +143,11 @@ export function RecentTransactions({ transactions, loading }: RecentTransactions
                   style={{
                     fontSize: 13,
                     fontWeight: 700,
-                    color: isIncome ? "#10b981" : "#f43f5e",
+                    color: isTransfer ? "var(--text-primary)" : isIncome ? "#10b981" : "#f43f5e",
                     flexShrink: 0,
                   }}
                 >
-                  {isIncome ? "+" : "-"}
+                  {isIncome ? "+" : isTransfer ? "" : "-"}
                   {formatCurrency(tx.amount, tx.wallet.currency)}
                 </div>
               </div>

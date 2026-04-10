@@ -32,6 +32,7 @@ export async function GET(request: Request) {
       include: {
         category: true,
         wallet: true,
+        toWallet: true,
       },
       orderBy: { date: "desc" },
       take: limit,
@@ -40,7 +41,14 @@ export async function GET(request: Request) {
     prisma.transaction.count({ where }),
   ]);
 
-  return NextResponse.json({ transactions, total, page, limit });
+  const mappedTransactions = transactions.map(tx => ({
+    ...tx,
+    category: tx.category || {
+        id: "sys-transfer", name: "Transfer", icon: "arrow-right-left", color: "#8b5cf6", type: "TRANSFER"
+    }
+  }));
+
+  return NextResponse.json({ transactions: mappedTransactions, total, page, limit });
 }
 
 export async function POST(request: Request) {
@@ -58,26 +66,49 @@ export async function POST(request: Request) {
     if (!wallet) return NextResponse.json({ error: "Wallet not found" }, { status: 404 });
 
     const transaction = await prisma.$transaction(async (tx) => {
+      // Extra logic to verify destination wallet existence if TRANSFER
+      if (validated.type === "TRANSFER" && validated.toWalletId) {
+        const toWallet = await tx.wallet.findFirst({
+            where: { id: validated.toWalletId, book: { userId: session.user.id } },
+        });
+        if (!toWallet) throw new Error("Destination Wallet not found");
+      }
+
       const t = await tx.transaction.create({
         data: {
           amount: validated.amount,
-          type: validated.type as "INCOME" | "EXPENSE",
+          type: validated.type as "INCOME" | "EXPENSE" | "TRANSFER",
           note: validated.note,
           date: new Date(validated.date),
           walletId: validated.walletId,
-          categoryId: validated.categoryId,
+          toWalletId: validated.toWalletId || null,
+          categoryId: validated.categoryId || null,
           budgetId: validated.budgetId || null,
         },
         include: { category: true, wallet: true },
       });
 
-      // Update wallet balance
-      const balanceDelta =
-        validated.type === "INCOME" ? validated.amount : -validated.amount;
-      await tx.wallet.update({
-        where: { id: validated.walletId },
-        data: { balance: { increment: balanceDelta } },
-      });
+      // Update wallet balances based on transaction type
+      if (validated.type === "TRANSFER") {
+          // Decrement source
+          await tx.wallet.update({
+             where: { id: validated.walletId },
+             data: { balance: { decrement: validated.amount } },
+          });
+          // Increment destination
+          if (validated.toWalletId) {
+              await tx.wallet.update({
+                  where: { id: validated.toWalletId },
+                  data: { balance: { increment: validated.amount } },
+              });
+          }
+      } else {
+          const balanceDelta = validated.type === "INCOME" ? validated.amount : -validated.amount;
+          await tx.wallet.update({
+            where: { id: validated.walletId },
+            data: { balance: { increment: balanceDelta } },
+          });
+      }
 
       // Update budget spent if linked
       if (validated.budgetId) {

@@ -108,10 +108,17 @@ export async function GET(request: Request) {
       wallet: { bookId },
       date: { gte: thisMonthStart, lte: thisMonthEnd }
     },
-    include: { category: true, wallet: true },
+    include: { category: true, wallet: true, toWallet: true },
     orderBy: { date: "desc" },
     take: 5,
   });
+
+  const mappedRecentTransactions = recentTransactions.map(tx => ({
+    ...tx,
+    category: tx.category || {
+        id: "sys-transfer", name: "Transfer", icon: "arrow-right-left", color: "#8b5cf6", type: "TRANSFER"
+    }
+  }));
 
   return NextResponse.json({
     totalBalance,
@@ -121,6 +128,6 @@ export async function GET(request: Request) {
     wallets,
     monthlyData,
     categoryChartData,
-    recentTransactions,
+    recentTransactions: mappedRecentTransactions,
   });
 }
