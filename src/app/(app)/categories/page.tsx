@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, Lock } from "lucide-react";
+import { Plus, Lock, Edit2, Trash2 } from "lucide-react";
 
 interface Category {
   id: string;
@@ -19,6 +19,7 @@ export default function CategoriesPage() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [formLoading, setFormLoading] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState({ name: "", type: "EXPENSE" as "INCOME" | "EXPENSE", color: "#6366f1" });
   const [activeTab, setActiveTab] = useState<"EXPENSE" | "INCOME">("EXPENSE");
 
@@ -31,17 +32,51 @@ export default function CategoriesPage() {
 
   useEffect(() => { fetchCategories(); }, []);
 
+  function handleEditClick(cat: Category) {
+    setEditId(cat.id);
+    setForm({ name: cat.name, type: cat.type as "EXPENSE" | "INCOME", color: cat.color });
+    setShowForm(true);
+  }
+
+  function handleCloseModal() {
+    setShowForm(false);
+    setEditId(null);
+    setForm({ name: "", type: "EXPENSE" as "INCOME" | "EXPENSE", color: "#6366f1" });
+  }
+
+  async function handleDelete(id: string) {
+    if (!confirm("Apakah Anda yakin ingin menghapus kategori ini?")) return;
+    
+    const res = await fetch(`/api/categories/${id}`, { method: "DELETE" });
+    if (!res.ok) {
+      const { error } = await res.json();
+      alert(error || "Gagal menghapus kategori.");
+      return;
+    }
+    
+    await fetchCategories();
+  }
+
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     setFormLoading(true);
-    await fetch("/api/categories", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
-    });
+    
+    if (editId) {
+      await fetch(`/api/categories/${editId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+    } else {
+      await fetch("/api/categories", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+    }
+    
     await fetchCategories();
-    setShowForm(false);
-    setForm({ name: "", type: "EXPENSE", color: "#6366f1" });
+    handleCloseModal();
     setFormLoading(false);
   }
 
@@ -174,6 +209,7 @@ export default function CategoriesPage() {
                     style={{
                       display: "flex",
                       alignItems: "center",
+                      justifyContent: "space-between",
                       gap: 10,
                       padding: "12px 14px",
                       borderRadius: 12,
@@ -181,8 +217,19 @@ export default function CategoriesPage() {
                       border: `1px solid ${cat.color}40`,
                     }}
                   >
-                    <div style={{ width: 10, height: 10, borderRadius: "50%", background: cat.color, flexShrink: 0 }} />
-                    <span style={{ fontSize: 13, fontWeight: 600, color: cat.color }}>{cat.name}</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, overflow: "hidden" }}>
+                      <div style={{ width: 10, height: 10, borderRadius: "50%", background: cat.color, flexShrink: 0 }} />
+                      <span style={{ fontSize: 13, fontWeight: 600, color: cat.color, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{cat.name}</span>
+                    </div>
+                    
+                    <div style={{ display: "flex", gap: 4 }}>
+                      <button onClick={() => handleEditClick(cat)} style={{ background: "transparent", border: "none", color: "var(--text-secondary)", cursor: "pointer", padding: 4 }} title="Edit">
+                        <Edit2 size={14} />
+                      </button>
+                      <button onClick={() => handleDelete(cat.id)} style={{ background: "transparent", border: "none", color: "#f43f5e", cursor: "pointer", padding: 4 }} title="Hapus">
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -193,9 +240,11 @@ export default function CategoriesPage() {
 
       {/* Modal */}
       {showForm && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 500, padding: 20 }} onClick={(e) => { if (e.target === e.currentTarget) setShowForm(false); }}>
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 500, padding: 20 }} onClick={(e) => { if (e.target === e.currentTarget) handleCloseModal(); }}>
           <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 20, padding: 28, width: "100%", maxWidth: 380 }}>
-            <h3 style={{ fontSize: 18, fontWeight: 700, color: "var(--text-primary)", marginBottom: 20 }}>Tambah Kategori</h3>
+            <h3 style={{ fontSize: 18, fontWeight: 700, color: "var(--text-primary)", marginBottom: 20 }}>
+              {editId ? "Edit Kategori" : "Tambah Kategori"}
+            </h3>
             <form onSubmit={handleCreate} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               <div>
                 <label style={{ display: "block", fontSize: 13, fontWeight: 500, color: "var(--text-secondary)", marginBottom: 8 }}>Nama</label>
@@ -220,7 +269,7 @@ export default function CategoriesPage() {
                 </div>
               </div>
               <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
-                <button type="button" onClick={() => setShowForm(false)} style={{ flex: 1, padding: "11px", borderRadius: 10, background: "var(--surface-2)", border: "1px solid var(--border)", color: "var(--text-secondary)", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Batal</button>
+                <button type="button" onClick={handleCloseModal} style={{ flex: 1, padding: "11px", borderRadius: 10, background: "var(--surface-2)", border: "1px solid var(--border)", color: "var(--text-secondary)", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Batal</button>
                 <button type="submit" disabled={formLoading} style={{ flex: 1, padding: "11px", borderRadius: 10, background: "linear-gradient(135deg, #6366f1, #4f46e5)", color: "white", border: "none", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>{formLoading ? "Menyimpan..." : "Simpan"}</button>
               </div>
             </form>
