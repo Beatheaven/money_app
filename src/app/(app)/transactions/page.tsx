@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useBookStore } from "@/store/bookStore";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { ArrowUpRight, ArrowDownLeft, Plus, Search, Filter } from "lucide-react";
+import { ArrowUpRight, ArrowDownLeft, Plus, Search, Filter, Edit2, Trash2 } from "lucide-react";
 import Link from "next/link";
 
 interface Transaction {
@@ -41,6 +41,17 @@ export default function TransactionsPage() {
     setTransactions(data.transactions ?? []);
     setTotal(data.total ?? 0);
     setLoading(false);
+  }
+
+  async function handleDelete(id: string) {
+    if (!confirm("Hapus transaksi ini? Aksi ini akan mengembalikan saldo dompet/budget terkait dan bersifat mutlak.")) return;
+    
+    const res = await fetch(`/api/transactions/${id}`, { method: "DELETE" });
+    if (!res.ok) {
+      alert("Gagal menghapus transaksi.");
+      return;
+    }
+    fetchTransactions();
   }
 
   useEffect(() => {
@@ -151,7 +162,7 @@ export default function TransactionsPage() {
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "2fr 1fr 1fr 1fr",
+                gridTemplateColumns: "3fr 2fr 2fr 2fr 60px",
                 padding: "12px 20px",
                 borderBottom: "1px solid var(--border)",
                 fontSize: 11,
@@ -165,6 +176,7 @@ export default function TransactionsPage() {
               <span>Kategori</span>
               <span>Tanggal</span>
               <span style={{ textAlign: "right" }}>Nominal</span>
+              <span style={{ textAlign: "right" }}>Aksi</span>
             </div>
 
             {/* Rows */}
@@ -175,7 +187,7 @@ export default function TransactionsPage() {
                   key={tx.id}
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "2fr 1fr 1fr 1fr",
+                    gridTemplateColumns: "3fr 2fr 2fr 2fr 60px",
                     padding: "14px 20px",
                     borderBottom: "1px solid rgba(255,255,255,0.04)",
                     alignItems: "center",
@@ -248,6 +260,16 @@ export default function TransactionsPage() {
                   >
                     {isIncome ? "+" : "-"}
                     {formatCurrency(tx.amount, tx.wallet.currency)}
+                  </div>
+
+                  {/* Actions */}
+                  <div style={{ display: "flex", justifyContent: "flex-end", gap: 4 }}>
+                    <Link href={`/transactions/edit/${tx.id}`} style={{ background: "transparent", border: "none", color: "var(--text-secondary)", padding: 4 }} title="Edit">
+                        <Edit2 size={14} />
+                    </Link>
+                    <button onClick={() => handleDelete(tx.id)} style={{ background: "transparent", border: "none", color: "#f43f5e", cursor: "pointer", padding: 4 }} title="Hapus">
+                        <Trash2 size={14} />
+                    </button>
                   </div>
                 </div>
               );

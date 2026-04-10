@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useBookStore } from "@/store/bookStore";
 import { formatCurrency } from "@/lib/utils";
-import { Plus, Banknote, Building2, Smartphone, TrendingUp, CreditCard, Wallet } from "lucide-react";
+import { Plus, Banknote, Building2, Smartphone, TrendingUp, CreditCard, Wallet, Edit2, Trash2 } from "lucide-react";
 
 const WALLET_ICONS: Record<string, React.ElementType> = {
   CASH: Banknote,
@@ -41,6 +41,7 @@ export default function WalletsPage() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [formLoading, setFormLoading] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState({ name: "", type: "CASH", balance: "0", currency: "IDR", color: "#6366f1" });
 
   async function fetchWallets() {
@@ -53,17 +54,50 @@ export default function WalletsPage() {
 
   useEffect(() => { fetchWallets(); }, [activeBookId]);
 
+  function handleEditClick(wallet: WalletData) {
+    setEditId(wallet.id);
+    setForm({ name: wallet.name, type: wallet.type, balance: wallet.balance.toString(), currency: wallet.currency, color: wallet.color });
+    setShowForm(true);
+  }
+
+  function handleCloseModal() {
+    setShowForm(false);
+    setEditId(null);
+    setForm({ name: "", type: "CASH", balance: "0", currency: "IDR", color: "#6366f1" });
+  }
+
+  async function handleDelete(id: string) {
+    if (!confirm("Apakah Anda yakin ingin menghapus DOMPET ini beserta PERMANEN?")) return;
+    
+    const res = await fetch(`/api/wallets/${id}`, { method: "DELETE" });
+    if (!res.ok) {
+      const { error } = await res.json();
+      alert(error || "Gagal menghapus dompet.");
+      return;
+    }
+    await fetchWallets();
+  }
+
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     setFormLoading(true);
-    await fetch("/api/wallets", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...form, balance: parseFloat(form.balance), bookId: activeBookId }),
-    });
+    
+    if (editId) {
+      await fetch(`/api/wallets/${editId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...form, balance: parseFloat(form.balance), bookId: activeBookId }),
+      });
+    } else {
+      await fetch("/api/wallets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...form, balance: parseFloat(form.balance), bookId: activeBookId }),
+      });
+    }
+    
     await fetchWallets();
-    setShowForm(false);
-    setForm({ name: "", type: "CASH", balance: "0", currency: "IDR", color: "#6366f1" });
+    handleCloseModal();
     setFormLoading(false);
   }
 
@@ -153,19 +187,31 @@ export default function WalletsPage() {
                     background: `${wallet.color}18`,
                   }}
                 />
-                <div
-                  style={{
-                    width: 42,
-                    height: 42,
-                    borderRadius: 12,
-                    background: `${wallet.color}22`,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    marginBottom: 16,
-                  }}
-                >
-                  <Icon size={20} color={wallet.color} />
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
+                  <div
+                    style={{
+                      width: 42,
+                      height: 42,
+                      borderRadius: 12,
+                      background: `${wallet.color}22`,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      zIndex: 1,
+                    }}
+                  >
+                    <Icon size={20} color={wallet.color} />
+                  </div>
+                  
+                  {/* Actions */}
+                  <div style={{ display: "flex", gap: 4, zIndex: 1 }}>
+                    <button onClick={() => handleEditClick(wallet)} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text-secondary)", cursor: "pointer", padding: 6 }} title="Edit">
+                      <Edit2 size={14} />
+                    </button>
+                    <button onClick={() => handleDelete(wallet.id)} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 6, color: "#f43f5e", cursor: "pointer", padding: 6 }} title="Hapus">
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
                 </div>
                 <div style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 6 }}>
                   {WALLET_TYPES.find((t) => t.value === wallet.type)?.label ?? wallet.type}
@@ -189,33 +235,12 @@ export default function WalletsPage() {
         </div>
       )}
 
-      {/* Modal: Add Wallet */}
+      {/* Modal */}
       {showForm && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.7)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 500,
-            padding: 20,
-          }}
-          onClick={(e) => { if (e.target === e.currentTarget) setShowForm(false); }}
-        >
-          <div
-            style={{
-              background: "var(--surface)",
-              border: "1px solid var(--border)",
-              borderRadius: 20,
-              padding: 28,
-              width: "100%",
-              maxWidth: 420,
-            }}
-          >
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 500, padding: 20 }} onClick={(e) => { if (e.target === e.currentTarget) handleCloseModal(); }}>
+          <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 20, padding: 28, width: "100%", maxWidth: 420 }}>
             <h3 style={{ fontSize: 18, fontWeight: 700, color: "var(--text-primary)", marginBottom: 20 }}>
-              Tambah Wallet Baru
+              {editId ? "Edit Wallet" : "Tambah Wallet Baru"}
             </h3>
             <form onSubmit={handleCreate} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               <div>
@@ -278,40 +303,8 @@ export default function WalletsPage() {
                 </div>
               </div>
               <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
-                <button
-                  type="button"
-                  onClick={() => setShowForm(false)}
-                  style={{
-                    flex: 1,
-                    padding: "11px",
-                    borderRadius: 10,
-                    background: "var(--surface-2)",
-                    border: "1px solid var(--border)",
-                    color: "var(--text-secondary)",
-                    fontSize: 14,
-                    fontWeight: 600,
-                    cursor: "pointer",
-                  }}
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  disabled={formLoading}
-                  style={{
-                    flex: 1,
-                    padding: "11px",
-                    borderRadius: 10,
-                    background: "linear-gradient(135deg, #6366f1, #4f46e5)",
-                    color: "white",
-                    border: "none",
-                    fontSize: 14,
-                    fontWeight: 600,
-                    cursor: "pointer",
-                  }}
-                >
-                  {formLoading ? "Menyimpan..." : "Simpan"}
-                </button>
+                <button type="button" onClick={handleCloseModal} style={{ flex: 1, padding: "11px", borderRadius: 10, background: "var(--surface-2)", border: "1px solid var(--border)", color: "var(--text-secondary)", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Batal</button>
+                <button type="submit" disabled={formLoading} style={{ flex: 1, padding: "11px", borderRadius: 10, background: "linear-gradient(135deg, #6366f1, #4f46e5)", color: "white", border: "none", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>{formLoading ? "Menyimpan..." : "Simpan"}</button>
               </div>
             </form>
           </div>

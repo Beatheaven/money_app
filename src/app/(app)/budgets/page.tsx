@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useBookStore } from "@/store/bookStore";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { Plus, AlertTriangle, CheckCircle } from "lucide-react";
+import { Plus, AlertTriangle, CheckCircle, Edit2, Trash2 } from "lucide-react";
 
 interface Budget {
   id: string;
@@ -38,6 +38,7 @@ export default function BudgetsPage() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [formLoading, setFormLoading] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: "",
     amount: "",
@@ -62,6 +63,46 @@ export default function BudgetsPage() {
 
   useEffect(() => { fetchData(); }, [activeBookId]);
 
+  function handleEditClick(budget: Budget) {
+    setEditId(budget.id);
+    setForm({
+        name: budget.name,
+        amount: budget.amount.toString(),
+        period: budget.period,
+        categoryId: budget.category.id || "",
+        startDate: new Date(budget.startDate).toISOString().split("T")[0],
+        endDate: new Date(budget.endDate).toISOString().split("T")[0],
+        isAutoRenew: budget.isAutoRenew,
+    });
+    setShowForm(true);
+  }
+
+  function handleCloseModal() {
+    setShowForm(false);
+    setEditId(null);
+    setForm({
+      name: "",
+      amount: "",
+      period: "MONTHLY",
+      categoryId: "",
+      startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split("T")[0],
+      endDate: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().split("T")[0],
+      isAutoRenew: true,
+    });
+  }
+
+  async function handleDelete(id: string) {
+    if (!confirm("Apakah Anda yakin ingin menghapus BUDGET ini secara permanen?")) return;
+    
+    const res = await fetch(`/api/budgets/${id}`, { method: "DELETE" });
+    if (!res.ok) {
+      const { error } = await res.json();
+      alert(error || "Gagal menghapus budget.");
+      return;
+    }
+    await fetchData();
+  }
+
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     setFormLoading(true);
@@ -76,19 +117,32 @@ export default function BudgetsPage() {
       finalEndDate = st.toISOString().split("T")[0];
     }
 
-    await fetch("/api/budgets", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ 
-        ...form, 
-        amount: parseFloat(form.amount), 
-        endDate: finalEndDate,
-        bookId: activeBookId 
-      }),
-    });
+    if (editId) {
+      await fetch(`/api/budgets/${editId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          ...form, 
+          amount: parseFloat(form.amount), 
+          endDate: finalEndDate,
+          bookId: activeBookId 
+        }),
+      });
+    } else {
+      await fetch("/api/budgets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          ...form, 
+          amount: parseFloat(form.amount), 
+          endDate: finalEndDate,
+          bookId: activeBookId 
+        }),
+      });
+    }
     
     await fetchData();
-    setShowForm(false);
+    handleCloseModal();
     setFormLoading(false);
   }
 
@@ -196,9 +250,19 @@ export default function BudgetsPage() {
                          <span style={{ fontSize: 11, fontWeight: 500, color: "#8b5cf6", padding: "3px 8px", borderRadius: 20, background: "rgba(139,92,246,0.1)" }}>⚡ Auto</span>
                       )}
                     </div>
-                    <h3 style={{ fontSize: 16, fontWeight: 700, color: "var(--text-primary)" }}>
-                      {budget.name}
-                    </h3>
+                    <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                        <h3 style={{ fontSize: 16, fontWeight: 700, color: "var(--text-primary)" }}>
+                        {budget.name}
+                        </h3>
+                        <div style={{ display: "flex", gap: 4 }}>
+                            <button onClick={() => handleEditClick(budget)} style={{ background: "transparent", border: "none", color: "var(--text-secondary)", cursor: "pointer", padding: 4 }} title="Edit">
+                                <Edit2 size={14} />
+                            </button>
+                            <button onClick={() => handleDelete(budget.id)} style={{ background: "transparent", border: "none", color: "#f43f5e", cursor: "pointer", padding: 4 }} title="Hapus">
+                                <Trash2 size={14} />
+                            </button>
+                        </div>
+                    </div>
                   </div>
                   <div style={{ textAlign: "right" }}>
                     <div style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 2 }}>
@@ -254,14 +318,16 @@ export default function BudgetsPage() {
         </div>
       )}
 
-      {/* Modal: Add Budget */}
+      {/* Modal StatusBar */}
       {showForm && (
         <div
           style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 500, padding: 20 }}
-          onClick={(e) => { if (e.target === e.currentTarget) setShowForm(false); }}
+          onClick={(e) => { if (e.target === e.currentTarget) handleCloseModal(); }}
         >
           <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 20, padding: 28, width: "100%", maxWidth: 420 }}>
-            <h3 style={{ fontSize: 18, fontWeight: 700, color: "var(--text-primary)", marginBottom: 20 }}>Buat Budget Baru</h3>
+            <h3 style={{ fontSize: 18, fontWeight: 700, color: "var(--text-primary)", marginBottom: 20 }}>
+                {editId ? "Edit Budget" : "Buat Budget Baru"}
+            </h3>
             <form onSubmit={handleCreate} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               <div>
                 <label style={{ display: "block", fontSize: 13, fontWeight: 500, color: "var(--text-secondary)", marginBottom: 8 }}>Nama Budget</label>
@@ -312,7 +378,7 @@ export default function BudgetsPage() {
                 </div>
               </div>
               <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
-                <button type="button" onClick={() => setShowForm(false)} style={{ flex: 1, padding: "11px", borderRadius: 10, background: "var(--surface-2)", border: "1px solid var(--border)", color: "var(--text-secondary)", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Batal</button>
+                <button type="button" onClick={handleCloseModal} style={{ flex: 1, padding: "11px", borderRadius: 10, background: "var(--surface-2)", border: "1px solid var(--border)", color: "var(--text-secondary)", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Batal</button>
                 <button type="submit" disabled={formLoading} style={{ flex: 1, padding: "11px", borderRadius: 10, background: "linear-gradient(135deg, #6366f1, #4f46e5)", color: "white", border: "none", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>{formLoading ? "Menyimpan..." : "Simpan"}</button>
               </div>
             </form>
