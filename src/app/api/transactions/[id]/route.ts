@@ -36,20 +36,21 @@ export async function PUT(
   const session = await auth();
   if (!session?.user?.id)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = session.user.id;
 
   try {
     const body = await request.json();
     const validated = transactionSchema.parse(body);
 
     const oldTx = await prisma.transaction.findFirst({
-      where: { id, wallet: { book: { userId: session.user.id } } },
+      where: { id, wallet: { book: { userId } } },
     });
 
     if (!oldTx)
       return NextResponse.json({ error: "Transaction not found" }, { status: 404 });
 
     const newWallet = await prisma.wallet.findFirst({
-      where: { id: validated.walletId, book: { userId: session.user.id } },
+      where: { id: validated.walletId, book: { userId } },
     });
 
     if (!newWallet)
@@ -88,7 +89,7 @@ export async function PUT(
           // Extra logic to verify destination wallet existence if TRANSFER
           if (validated.toWalletId) {
             const toWallet = await tx.wallet.findFirst({
-                where: { id: validated.toWalletId, book: { userId: session.user.id } },
+                where: { id: validated.toWalletId, book: { userId } },
             });
             if (!toWallet) throw new Error("Destination Wallet not found");
           }
@@ -150,10 +151,11 @@ export async function DELETE(
   const session = await auth();
   if (!session?.user?.id)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = session.user.id;
 
   try {
     const oldTx = await prisma.transaction.findFirst({
-      where: { id, wallet: { book: { userId: session.user.id } } },
+      where: { id, wallet: { book: { userId } } },
     });
 
     if (!oldTx)
