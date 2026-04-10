@@ -54,6 +54,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = session.user.id;
 
   try {
     const body = await request.json();
@@ -61,7 +62,7 @@ export async function POST(request: Request) {
 
     // Verify wallet ownership
     const wallet = await prisma.wallet.findFirst({
-      where: { id: validated.walletId, book: { userId: session.user.id } },
+      where: { id: validated.walletId, book: { userId } },
     });
     if (!wallet) return NextResponse.json({ error: "Wallet not found" }, { status: 404 });
 
@@ -69,7 +70,7 @@ export async function POST(request: Request) {
       // Extra logic to verify destination wallet existence if TRANSFER
       if (validated.type === "TRANSFER" && validated.toWalletId) {
         const toWallet = await tx.wallet.findFirst({
-            where: { id: validated.toWalletId, book: { userId: session.user.id } },
+            where: { id: validated.toWalletId, book: { userId } },
         });
         if (!toWallet) throw new Error("Destination Wallet not found");
       }
