@@ -9,6 +9,8 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url);
   const bookId = searchParams.get("bookId");
+  const yearParam = searchParams.get("year");
+  const monthParam = searchParams.get("month");
 
   if (!bookId) return NextResponse.json({ error: "bookId required" }, { status: 400 });
 
@@ -17,7 +19,11 @@ export async function GET(request: Request) {
   });
   if (!book) return NextResponse.json({ error: "Book not found" }, { status: 404 });
 
-  const now = new Date();
+  let now = new Date();
+  if (yearParam && monthParam) {
+    now = new Date(parseInt(yearParam), parseInt(monthParam) - 1, 1);
+  }
+  
   const thisMonthStart = startOfMonth(now);
   const thisMonthEnd = endOfMonth(now);
 
@@ -96,9 +102,12 @@ export async function GET(request: Request) {
     };
   });
 
-  // Recent transactions (last 5)
+  // Recent transactions (last 5 in selected month)
   const recentTransactions = await prisma.transaction.findMany({
-    where: { wallet: { bookId } },
+    where: { 
+      wallet: { bookId },
+      date: { gte: thisMonthStart, lte: thisMonthEnd }
+    },
     include: { category: true, wallet: true },
     orderBy: { date: "desc" },
     take: 5,
