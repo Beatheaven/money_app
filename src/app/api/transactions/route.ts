@@ -81,18 +81,20 @@ export async function POST(request: Request) {
     const validated = transactionSchema.parse(body);
 
     // Verify wallet ownership
-    const wallet = await prisma.wallet.findFirst({
-      where: { id: validated.walletId, book: { userId } },
+    const wallet = await prisma.wallet.findUnique({
+      where: { id: validated.walletId },
+      include: { book: true }
     });
-    if (!wallet) return NextResponse.json({ error: "Wallet not found" }, { status: 404 });
+    if (!wallet || wallet.book.userId !== userId) return NextResponse.json({ error: "Wallet not found" }, { status: 404 });
 
     const transaction = await prisma.$transaction(async (tx) => {
       // Extra logic to verify destination wallet existence if TRANSFER
       if (validated.type === "TRANSFER" && validated.toWalletId) {
-        const toWallet = await tx.wallet.findFirst({
-            where: { id: validated.toWalletId, book: { userId } },
+        const toWallet = await tx.wallet.findUnique({
+            where: { id: validated.toWalletId },
+            include: { book: true }
         });
-        if (!toWallet) throw new Error("Destination Wallet not found");
+        if (!toWallet || toWallet.book.userId !== userId) throw new Error("Destination Wallet not found");
       }
 
       const t = await tx.transaction.create({
@@ -145,8 +147,12 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json(transaction, { status: 201 });
-  } catch (error) {
-    console.error(error);
-    return NextResponse.json({ error: "Invalid data" }, { status: 400 });
+  } catch (error: any) {
+    if (error?.name === "ZodError" || error?.issues) {
+      console.error("Zod Validation Error:", error.issues);
+      return NextResponse.json({ error: "Validation Error", issues: error.issues }, { status: 400 });
+    }
+    console.error("Transaction POST Error:", error);
+    return NextResponse.json({ error: error?.message || "Invalid data" }, { status: 400 });
   }
 }
