@@ -4,15 +4,16 @@ import { prisma } from "@/lib/prisma";
 import { startOfMonth, endOfMonth, subMonths, startOfDay, endOfDay } from "date-fns";
 
 export async function GET(request: Request) {
-  const session = await auth();
-  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { searchParams } = new URL(request.url);
-  const bookId = searchParams.get("bookId");
-  const yearParam = searchParams.get("year");
-  const monthParam = searchParams.get("month");
+    const { searchParams } = new URL(request.url);
+    const bookId = searchParams.get("bookId");
+    const yearParam = searchParams.get("year");
+    const monthParam = searchParams.get("month");
 
-  if (!bookId) return NextResponse.json({ error: "bookId required" }, { status: 400 });
+    if (!bookId) return NextResponse.json({ error: "bookId required" }, { status: 400 });
 
   const book = await prisma.book.findFirst({
     where: { id: bookId, userId: session.user.id },
@@ -33,11 +34,25 @@ export async function GET(request: Request) {
     select: { id: true, name: true, balance: true, currency: true, color: true, icon: true, type: true },
   });
   const totalBalance = wallets.reduce((sum, w) => sum + w.balance, 0);
+  const walletIds = wallets.map((w) => w.id);
+
+  if (walletIds.length === 0) {
+    return NextResponse.json({
+      totalBalance: 0,
+      incomeThisMonth: 0,
+      expenseThisMonth: 0,
+      savingsRate: 0,
+      wallets: [],
+      monthlyData: Array.from({ length: 6 }, (_, i) => ({ month: subMonths(now, 5 - i).toLocaleDateString("id-ID", { month: "short", year: "2-digit" }), income: 0, expense: 0 })),
+      categoryChartData: [],
+      recentTransactions: [],
+    });
+  }
 
   // This month income & expense
   const thisMonthTxns = await prisma.transaction.findMany({
     where: {
-      wallet: { bookId },
+      walletId: { in: walletIds },
       date: { gte: thisMonthStart, lte: thisMonthEnd },
     },
     select: { amount: true, type: true },
@@ -61,7 +76,7 @@ export async function GET(request: Request) {
       const month = subMonths(now, 5 - i);
       return prisma.transaction.findMany({
         where: {
-          wallet: { bookId },
+          walletId: { in: walletIds },
           date: { gte: startOfMonth(month), lte: endOfMonth(month) },
         },
         select: { amount: true, type: true },
@@ -77,7 +92,7 @@ export async function GET(request: Request) {
   const categoryData = await prisma.transaction.groupBy({
     by: ["categoryId"],
     where: {
-      wallet: { bookId },
+      walletId: { in: walletIds },
       type: "EXPENSE",
       date: { gte: thisMonthStart, lte: thisMonthEnd },
     },
@@ -107,7 +122,7 @@ export async function GET(request: Request) {
   // Recent transactions (last 5 in selected month)
   const recentTransactions = await prisma.transaction.findMany({
     where: { 
-      wallet: { bookId },
+      walletId: { in: walletIds },
       date: { gte: thisMonthStart, lte: thisMonthEnd }
     },
     include: { category: true, wallet: true, toWallet: true },
@@ -132,4 +147,8 @@ export async function GET(request: Request) {
     categoryChartData,
     recentTransactions: mappedRecentTransactions,
   });
+  } catch (error: any) {
+    console.error("Dashboard calculation error:", error);
+    return NextResponse.json({ error: error?.message || "Internal Server Error" }, { status: 500 });
+  }
 }

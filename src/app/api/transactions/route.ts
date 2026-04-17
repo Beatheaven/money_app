@@ -4,25 +4,41 @@ import { prisma } from "@/lib/prisma";
 import { transactionSchema } from "@/lib/validations";
 
 export async function GET(request: Request) {
-  const session = await auth();
-  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { searchParams } = new URL(request.url);
-  const bookId = searchParams.get("bookId");
-  const walletId = searchParams.get("walletId");
-  const type = searchParams.get("type");
-  const categoryId = searchParams.get("categoryId");
-  const limit = parseInt(searchParams.get("limit") ?? "50");
-  const page = parseInt(searchParams.get("page") ?? "1");
+    const { searchParams } = new URL(request.url);
+    const bookId = searchParams.get("bookId");
+    const walletId = searchParams.get("walletId");
+    const type = searchParams.get("type");
+    const categoryId = searchParams.get("categoryId");
+    const limit = parseInt(searchParams.get("limit") ?? "50");
+    const page = parseInt(searchParams.get("page") ?? "1");
   const skip = (page - 1) * limit;
 
-  const where: Record<string, unknown> = {
-    wallet: {
+  const wallets = await prisma.wallet.findMany({
+    where: {
       book: bookId ? { id: bookId, userId: session.user.id } : { userId: session.user.id },
     },
+    select: { id: true }
+  });
+  const walletIds = wallets.map(w => w.id);
+
+  if (walletIds.length === 0) {
+    return NextResponse.json({ transactions: [], total: 0, page, limit });
+  }
+
+  const where: Record<string, unknown> = {
+    walletId: { in: walletIds },
   };
 
-  if (walletId) where.walletId = walletId;
+  if (walletId) {
+    if (!walletIds.includes(walletId)) {
+      return NextResponse.json({ transactions: [], total: 0, page, limit });
+    }
+    where.walletId = walletId;
+  }
   if (type) where.type = type;
   if (categoryId) where.categoryId = categoryId;
 
@@ -49,6 +65,10 @@ export async function GET(request: Request) {
   }));
 
   return NextResponse.json({ transactions: mappedTransactions, total, page, limit });
+  } catch (error: any) {
+    console.error("Transactions GET error:", error);
+    return NextResponse.json({ error: error?.message || "Internal Server Error" }, { status: 500 });
+  }
 }
 
 export async function POST(request: Request) {

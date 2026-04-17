@@ -89,7 +89,7 @@ export default function NewTransactionPage() {
         body: JSON.stringify({
           amount,
           type: form.type,
-          note: form.note || null,
+          note: form.note || undefined,
           date: form.date,
           walletId: form.walletId,
           toWalletId: form.type === "TRANSFER" ? form.toWalletId : undefined,
