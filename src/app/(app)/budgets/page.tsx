@@ -38,6 +38,8 @@ export default function BudgetsPage() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [formLoading, setFormLoading] = useState(false);
+  const [recalcLoading, setRecalcLoading] = useState(false);
+  const [recalcMsg, setRecalcMsg] = useState("");
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: "",
@@ -103,6 +105,21 @@ export default function BudgetsPage() {
     await fetchData();
   }
 
+  async function handleRecalculate() {
+    setRecalcLoading(true);
+    setRecalcMsg("");
+    try {
+      const res = await fetch("/api/budgets/recalculate", { method: "POST" });
+      const data = await res.json();
+      setRecalcMsg(data.message ?? "Selesai");
+      await fetchData();
+    } catch {
+      setRecalcMsg("Gagal menghitung ulang.");
+    } finally {
+      setRecalcLoading(false);
+    }
+  }
+
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     setFormLoading(true);
@@ -161,26 +178,52 @@ export default function BudgetsPage() {
             Budget 🎯
           </h1>
           <p style={{ color: "var(--text-secondary)", fontSize: 14 }}>{budgets.length} budget aktif</p>
+          {recalcMsg && (
+            <p style={{ fontSize: 12, color: "#10b981", marginTop: 4 }}>✅ {recalcMsg}</p>
+          )}
         </div>
-        <button
-          onClick={() => setShowForm(true)}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            padding: "10px 18px",
-            borderRadius: 10,
-            background: "linear-gradient(135deg, #6366f1, #4f46e5)",
-            color: "white",
-            border: "none",
-            fontSize: 14,
-            fontWeight: 600,
-            cursor: "pointer",
-          }}
-        >
-          <Plus size={16} />
-          Buat Budget
-        </button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            onClick={handleRecalculate}
+            disabled={recalcLoading}
+            title="Hitung ulang saldo budget dari semua transaksi yang sudah ada"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "10px 14px",
+              borderRadius: 10,
+              background: "var(--surface)",
+              border: "1px solid var(--border)",
+              color: "var(--text-secondary)",
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: recalcLoading ? "not-allowed" : "pointer",
+              opacity: recalcLoading ? 0.6 : 1,
+            }}
+          >
+            {recalcLoading ? "Menghitung..." : "🔄 Hitung Ulang"}
+          </button>
+          <button
+            onClick={() => setShowForm(true)}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "10px 18px",
+              borderRadius: 10,
+              background: "linear-gradient(135deg, #6366f1, #4f46e5)",
+              color: "white",
+              border: "none",
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            <Plus size={16} />
+            Buat Budget
+          </button>
+        </div>
       </div>
 
       {loading ? (
