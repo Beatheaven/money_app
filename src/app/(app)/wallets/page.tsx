@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useBookStore } from "@/store/bookStore";
 import { formatCurrency } from "@/lib/utils";
 import { Plus, Banknote, Building2, Smartphone, TrendingUp, CreditCard, Wallet, Edit2, Trash2 } from "lucide-react";
+import AmountInput from "@/components/ui/AmountInput";
 
 const WALLET_ICONS: Record<string, React.ElementType> = {
   CASH: Banknote,
@@ -269,17 +270,12 @@ export default function WalletsPage() {
                   ))}
                 </select>
               </div>
-              <div>
-                <label style={{ display: "block", fontSize: 13, fontWeight: 500, color: "var(--text-secondary)", marginBottom: 8 }}>Saldo Awal</label>
-                <input
-                  type="number"
-                  value={form.balance}
-                  onChange={(e) => setForm({ ...form, balance: e.target.value })}
-                  className="input-base"
-                  min="0"
-                  step="any"
+              <AmountInput
+                  id="walletBalance"
+                  label="Saldo Awal"
+                  value={form.balance || "0"}
+                  onChange={(val) => setForm({ ...form, balance: val })}
                 />
-              </div>
               <div>
                 <label style={{ display: "block", fontSize: 13, fontWeight: 500, color: "var(--text-secondary)", marginBottom: 10 }}>Warna</label>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>

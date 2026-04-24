@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useBookStore } from "@/store/bookStore";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { Plus, AlertTriangle, CheckCircle, Edit2, Trash2 } from "lucide-react";
+import AmountInput from "@/components/ui/AmountInput";
 
 interface Budget {
   id: string;
@@ -398,10 +399,13 @@ export default function BudgetsPage() {
                   Perbarui otomatis tiap siklus (Budget Permanen)
                 </label>
               </div>
-              <div>
-                <label style={{ display: "block", fontSize: 13, fontWeight: 500, color: "var(--text-secondary)", marginBottom: 8 }}>Limit Nominal</label>
-                <input type="number" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} className="input-base" placeholder="0" min="0" step="any" required />
-              </div>
+              <AmountInput
+                id="budgetAmount"
+                label="Limit Nominal"
+                value={form.amount || "0"}
+                onChange={(val) => setForm({ ...form, amount: val })}
+                required
+              />
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <div>
                   <label style={{ display: "block", fontSize: 13, fontWeight: 500, color: "var(--text-secondary)", marginBottom: 8 }}>Tanggal Mulai</label>

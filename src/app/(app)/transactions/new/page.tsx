@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { formatDate } from "@/lib/utils";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
+import AmountInput from "@/components/ui/AmountInput";
 
 interface Category {
   id: string;
@@ -193,23 +194,14 @@ export default function NewTransactionPage() {
           </div>
 
           {/* Amount */}
-          <div>
-            <label htmlFor="amount" style={{ display: "block", fontSize: 13, fontWeight: 500, color: "var(--text-secondary)", marginBottom: 8 }}>
-              Nominal
-            </label>
-            <input
-              id="amount"
-              type="number"
-              value={form.amount}
-              onChange={(e) => setForm({ ...form, amount: e.target.value })}
-              placeholder="0"
-              min="0"
-              step="any"
-              required
-              className="input-base"
-              style={{ fontSize: 22, fontWeight: 700 }}
-            />
-          </div>
+          <AmountInput
+            id="amount"
+            label="Nominal"
+            value={form.amount || "0"}
+            onChange={(val) => setForm({ ...form, amount: val })}
+            required
+            large
+          />
 
           {/* Wallet */}
           <div>
