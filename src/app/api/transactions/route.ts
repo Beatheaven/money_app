@@ -133,11 +133,20 @@ export async function POST(request: Request) {
           });
       }
 
-      // Update budget spent if linked
-      if (validated.budgetId) {
-        if (validated.type === "EXPENSE") {
+      // Auto-update budget spent based on matching category + date range
+      if (validated.type === "EXPENSE" && validated.categoryId) {
+        const transactionDate = new Date(validated.date);
+        const matchingBudget = await tx.budget.findFirst({
+          where: {
+            categoryId: validated.categoryId,
+            bookId: wallet.bookId,
+            startDate: { lte: transactionDate },
+            endDate:   { gte: transactionDate },
+          },
+        });
+        if (matchingBudget) {
           await tx.budget.update({
-            where: { id: validated.budgetId },
+            where: { id: matchingBudget.id },
             data: { spent: { increment: validated.amount } },
           });
         }

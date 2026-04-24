@@ -83,7 +83,15 @@ export async function GET(request: Request) {
     });
   }
 
-  return NextResponse.json(budgets);
+  // Filter out archived/historical budget records:
+  // A budget is "archived" if it has already expired AND its isAutoRenew was turned off
+  // (meaning it was already cloned into a newer period — it's historical data only)
+  const activeBudgets = budgets.filter((b) => {
+    const isExpired = new Date(b.endDate) < now;
+    return !(isExpired && !b.isAutoRenew);
+  });
+
+  return NextResponse.json(activeBudgets);
 }
 
 export async function POST(request: Request) {
